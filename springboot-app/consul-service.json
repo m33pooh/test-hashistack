@@ -1,0 +1,12 @@
+{
+  "Name": "springboot-app",
+  "ID": "springboot-app-1",
+  "Tags": ["spring", "demo"],
+  "Address": "",
+  "Port": 8080,
+  "Check": {
+    "HTTP": "http://localhost:8080/actuator/health",
+    "Interval": "10s",
+    "Timeout": "2s"
+  }
+}

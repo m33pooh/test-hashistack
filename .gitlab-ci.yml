@@ -1,0 +1,71 @@
+# GitLab CI pipeline for building Spring Boot app, publishing Docker image, and deploying with Terraform to Nomad
+
+stages:
+  - build
+  - publish
+  - deploy
+
+variables:
+  MAVEN_CLI_OPTS: "-B -DskipTests"
+  IMAGE_NAME: "${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
+  LATEST_TAG: "${CI_REGISTRY_IMAGE}:latest"
+
+# 1) Build the JAR with Maven
+build:
+  image: maven:3.9-eclipse-temurin-17
+  stage: build
+  script:
+    - mvn $MAVEN_CLI_OPTS package
+  artifacts:
+    paths:
+      - springboot-app/target/*.jar
+    expire_in: 1 hour
+
+# 2) Build and push the Docker image to the GitLab Container Registry
+docker_build_and_push:
+  image: docker:24.0.2
+  services:
+    - docker:dind
+  stage: publish
+  variables:
+    # Required for docker:dind in modern GitLab Runners
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+  script:
+    - docker build -t "$IMAGE_NAME" ./springboot-app
+    - docker push "$IMAGE_NAME"
+    - docker tag "$IMAGE_NAME" "$LATEST_TAG" || true
+    - docker push "$LATEST_TAG" || true
+    # Expose the image to the deploy job via dotenv artifact (sets TF_VAR_app_image)
+    - echo "TF_VAR_app_image=$IMAGE_NAME" > image.env
+  artifacts:
+    reports:
+      dotenv: image.env
+  only:
+    - main
+
+# 3) Deploy using Terraform (applies job to Nomad and writes Vault secret)
+terraform_deploy:
+  image: hashicorp/terraform:1.9
+  stage: deploy
+  variables:
+    TF_IN_AUTOMATION: "true"
+  before_script:
+    - apk add --no-cache curl jq bash || true
+    # Configure provider endpoints with CI variables (set in project settings)
+    - echo "Using NOMAD_ADDR=$NOMAD_ADDR VAULT_ADDR=$VAULT_ADDR CONSUL_HTTP_ADDR=$CONSUL_HTTP_ADDR"
+    - echo "TF_VAR_app_image is set to: $TF_VAR_app_image"
+  script:
+    - cd terraform
+    - terraform init -input=false
+    - terraform apply -auto-approve -input=false
+  only:
+    - main
+
+# NOTES:
+# - Set CI/CD variables in your GitLab project: CI_REGISTRY_USER, CI_REGISTRY_PASSWORD (auto-provided by GitLab),
+#   NOMAD_ADDR, VAULT_ADDR, CONSUL_HTTP_ADDR. When using the GitLab-managed Container Registry, CI_REGISTRY and CI_REGISTRY_IMAGE are provided.
+# - The deploy job needs network access to Nomad, Vault and Consul. That can be achieved by running a runner that has network access
+#   (for example a self-hosted runner on the same host or network where Nomad/Consul/Vault run).
+# - Alternatively, use the GitLab Runner with Docker socket access and the host network (or VPN) so terraform can reach localhost services.
