@@ -1,20 +1,24 @@
 package com.example.demo;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
-import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 public class HelloController {
 
     private final RestTemplate rest = new RestTemplate();
+
+    @Autowired
+    private NullSafetyExample nullSafetyExample;
 
     @Value("${VAULT_TOKEN:root}")
     private String vaultToken;
@@ -52,5 +56,56 @@ public class HelloController {
         }
 
         return out;
+    }
+
+    /**
+     * Endpoint demonstrating null safety patterns
+     */
+    @GetMapping("/null-safety-demo")
+    public Map<String, Object> nullSafetyDemo(
+            @RequestParam(required = false) String firstName,
+            @RequestParam(required = false) String lastName,
+            @RequestParam(required = false) String email) {
+        
+        Map<String, Object> result = new HashMap<>();
+        
+        // Example 1: Display name with null safety
+        String displayName = nullSafetyExample.getDisplayName(firstName, lastName);
+        result.put("display_name", displayName);
+        
+        // Example 2: Optional chaining
+        Optional<String> safeFind = nullSafetyExample.safeFind(email);
+        result.put("email_found", safeFind.isPresent());
+        result.put("email_value", safeFind.orElse("Not found"));
+        
+        // Example 3: String processing with null handling
+        int emailLength = nullSafetyExample.getLength(email);
+        result.put("email_length", emailLength);
+        
+        // Example 4: Null-safe UserInfo record
+        NullSafetyExample.UserInfo userInfo = new NullSafetyExample.UserInfo("user-" + System.nanoTime(), 
+            displayName != null ? displayName : "Unknown User", 
+            email, 
+            null);
+        result.put("user_info", Map.of(
+            "id", userInfo.id(),
+            "name", userInfo.name(),
+            "contact", userInfo.getContactInfo()
+        ));
+        
+        result.put("message", "Null safety example - Spring Boot 4.0.0 with Java 25");
+        return result;
+    }
+
+    /**
+     * Health check endpoint
+     */
+    @GetMapping("/version")
+    public Map<String, String> version() {
+        Map<String, String> info = new HashMap<>();
+        info.put("spring_boot_version", "4.0.0");
+        info.put("java_version", "25");
+        info.put("message", "Running with enhanced null safety features");
+        return info;
     }
 }
