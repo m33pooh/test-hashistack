@@ -5,6 +5,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import java.util.Objects;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Demonstrates null safety patterns in Java 25 with Spring Boot 4.0.0
@@ -15,6 +16,7 @@ import java.util.Optional;
  * 3. Objects.requireNonNull() for explicit null checks
  */
 @Service
+@Slf4j
 public class NullSafetyExample {
 
     /**
@@ -40,7 +42,8 @@ public class NullSafetyExample {
 
     /**
      * Example 3: Using Optional for better null handling
-     * Returns Optional instead of null, forcing callers to handle the absence of value
+     * Returns Optional instead of null, forcing callers to handle the absence of
+     * value
      */
     public Optional<String> safeFind(String key) {
         if ("valid".equals(key)) {
@@ -56,7 +59,7 @@ public class NullSafetyExample {
     public void validateRequired(@NotNull String userId, @NotNull String email) {
         Objects.requireNonNull(userId, "userId cannot be null");
         Objects.requireNonNull(email, "email cannot be null");
-        
+
         // Safe to use userId and email now
         processUserData(userId, email);
     }
@@ -77,13 +80,13 @@ public class NullSafetyExample {
      */
     public String getDisplayName(@Nullable String firstName, @Nullable String lastName) {
         String first = Optional.ofNullable(firstName)
-            .filter(f -> !f.isBlank())
-            .orElse("Unknown");
-        
+                .filter(f -> !f.isBlank())
+                .orElse("Unknown");
+
         String last = Optional.ofNullable(lastName)
-            .filter(l -> !l.isBlank())
-            .orElse("User");
-        
+                .filter(l -> !l.isBlank())
+                .orElse("User");
+
         return first + " " + last;
     }
 
@@ -93,22 +96,23 @@ public class NullSafetyExample {
      */
     public Optional<String> getUserEmail(@Nullable User user) {
         return Optional.ofNullable(user)
-            .map(User::getProfile)
-            .map(Profile::getEmail)
-            .filter(email -> email.contains("@"));
+                .map(User::getProfile)
+                .map(Profile::getEmail)
+                .filter(email -> email.contains("@"));
     }
 
     /**
      * Example 8: Using Optional.ifPresentOrElse (Java 9+)
      */
     public String processValueOrDefault(@Nullable String value, String defaultValue) {
-        return Optional.ofNullable(value)
-            .filter(v -> !v.isBlank())
-            .ifPresentOrElse(
-                v -> System.out.println("Processing: " + v),
-                () -> System.out.println("Using default: " + defaultValue)
-            );
-        return Optional.ofNullable(value).orElse(defaultValue);
+        Optional<String> opt = Optional.ofNullable(value)
+                .filter(v -> !v.isBlank());
+
+        opt.ifPresentOrElse(
+                v -> log.info("Processing: {}", v),
+                () -> log.info("Using default: {}", defaultValue));
+
+        return opt.orElse(defaultValue);
     }
 
     /**
@@ -116,19 +120,18 @@ public class NullSafetyExample {
      */
     public Optional<Integer> getUserAgeIfAdult(@Nullable User user) {
         return Optional.ofNullable(user)
-            .map(User::getAge)
-            .filter(age -> age >= 18);
+                .map(User::getAge)
+                .filter(age -> age >= 18);
     }
 
     /**
      * Example 10: Using record with nullable fields (Java 16+)
      */
     public record UserInfo(
-        @NotNull String id,
-        @NotNull String name,
-        @Nullable String email,
-        @Nullable String phone
-    ) {
+            @NotNull String id,
+            @NotNull String name,
+            @Nullable String email,
+            @Nullable String phone) {
         // Constructor validation
         public UserInfo {
             Objects.requireNonNull(id, "id cannot be null");
@@ -152,9 +155,17 @@ public class NullSafetyExample {
             this.profile = profile;
         }
 
-        public String getName() { return name; }
-        public int getAge() { return age; }
-        public Profile getProfile() { return profile; }
+        public String getName() {
+            return name;
+        }
+
+        public int getAge() {
+            return age;
+        }
+
+        public Profile getProfile() {
+            return profile;
+        }
     }
 
     public static class Profile {
@@ -164,7 +175,9 @@ public class NullSafetyExample {
             this.email = email;
         }
 
-        public String getEmail() { return email; }
+        public String getEmail() {
+            return email;
+        }
     }
 
     /**
@@ -172,10 +185,10 @@ public class NullSafetyExample {
      */
     public Optional<String> findFirstValidEmail(@Nullable java.util.List<String> emails) {
         return Optional.ofNullable(emails)
-            .stream()
-            .flatMap(java.util.Collection::stream)
-            .filter(email -> email.contains("@"))
-            .findFirst();
+                .stream()
+                .flatMap(java.util.Collection::stream)
+                .filter(email -> email.contains("@"))
+                .findFirst();
     }
 
     /**
@@ -183,12 +196,12 @@ public class NullSafetyExample {
      */
     public String getUserDisplayName(@Nullable User user) {
         return Optional.ofNullable(user)
-            .map(User::getName)
-            .orElse("Anonymous");
+                .map(User::getName)
+                .orElse("Anonymous");
     }
 
     private void processUserData(String userId, String email) {
         // Process user data safely
-        System.out.println("Processing user: " + userId + " with email: " + email);
+        log.info("Processing user: {} with email: {}", userId, email);
     }
 }
